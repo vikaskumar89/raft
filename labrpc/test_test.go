@@ -516,7 +516,7 @@ func TestRegression1(t *testing.T) {
 }
 
 //
-// if an RPC is stuck in a server, and the server
+// if an RPC is stuck in a storage, and the storage
 // is killed with DeleteServer(), does the RPC
 // get un-stuck?
 //

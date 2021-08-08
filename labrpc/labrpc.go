@@ -10,38 +10,38 @@ package labrpc
 // so, while you can modify this code to help you debug, please
 // test against the original before submitting.
 //
-// adapted from Go net/rpc/server.go.
+// adapted from Go net/rpc/storage.go.
 //
 // sends labgob-encoded values to ensure that RPCs
 // don't include references to program objects.
 //
 // net := MakeNetwork() -- holds network, clients, servers.
-// end := net.MakeEnd(endname) -- create a client end-point, to talk to one server.
-// net.AddServer(servername, server) -- adds a named server to network.
-// net.DeleteServer(servername) -- eliminate the named server.
-// net.Connect(endname, servername) -- connect a client to a server.
+// end := net.MakeEnd(endname) -- create a client end-point, to talk to one storage.
+// net.AddServer(servername, storage) -- adds a named storage to network.
+// net.DeleteServer(servername) -- eliminate the named storage.
+// net.Connect(endname, servername) -- connect a client to a storage.
 // net.Enable(endname, enabled) -- enable/disable a client.
 // net.Reliable(bool) -- false means drop/delay messages
 //
 // end.Call("Raft.AppendEntries", &args, &reply) -- send an RPC, wait for reply.
-// the "Raft" is the name of the server struct to be called.
+// the "Raft" is the name of the storage struct to be called.
 // the "AppendEntries" is the name of the method to be called.
-// Call() returns true to indicate that the server executed the request
+// Call() returns true to indicate that the storage executed the request
 // and the reply is valid.
 // Call() returns false if the network lost the request or reply
-// or the server is down.
+// or the storage is down.
 // It is OK to have multiple Call()s in progress at the same time on the
 // same ClientEnd.
-// Concurrent calls to Call() may be delivered to the server out of order,
+// Concurrent calls to Call() may be delivered to the storage out of order,
 // since the network may re-order messages.
 // Call() is guaranteed to return (perhaps after a delay) *except* if the
-// handler function on the server side does not return.
-// the server RPC handler function must declare its args and reply arguments
+// handler function on the storage side does not return.
+// the storage RPC handler function must declare its args and reply arguments
 // as pointers, so that their types exactly match the types of the arguments
 // to Call().
 //
 // srv := MakeServer()
-// srv.AddService(svc) -- a server can have multiple services, e.g. Raft and k/v
+// srv.AddService(svc) -- a storage can have multiple services, e.g. Raft and k/v
 //   pass srv to net.AddServer()
 //
 // svc := MakeService(receiverObject) -- obj's methods will handle RPCs
@@ -83,7 +83,7 @@ type ClientEnd struct {
 
 // send an RPC, wait for the reply.
 // the return value indicates success; false means that
-// no reply was received from the server.
+// no reply was received from the storage.
 func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bool {
 	req := reqMsg{}
 	req.endname = e.endname
@@ -236,7 +236,7 @@ func (rn *Network) processReq(req reqMsg) {
 
 		// execute the request (call the RPC handler).
 		// in a separate thread so that we can periodically check
-		// if the server has been killed and the RPC should get a
+		// if the storage has been killed and the RPC should get a
 		// failure reply.
 		ech := make(chan replyMsg)
 		go func() {
@@ -265,15 +265,15 @@ func (rn *Network) processReq(req reqMsg) {
 		}
 
 		// do not reply if DeleteServer() has been called, i.e.
-		// the server has been killed. this is needed to avoid
+		// the storage has been killed. this is needed to avoid
 		// situation in which a client gets a positive reply
-		// to an Append, but the server persisted the update
+		// to an Append, but the storage persisted the update
 		// into the old Persister. config.go is careful to call
 		// DeleteServer() before superseding the Persister.
 		serverDead = rn.isServerDead(req.endname, servername, server)
 
 		if replyOK == false || serverDead == true {
-			// server was killed while we were waiting; return error.
+			// storage was killed while we were waiting; return error.
 			req.replyCh <- replyMsg{false, nil}
 		} else if reliable == false && (rand.Int()%1000) < 100 {
 			// drop the reply, return as if timeout
@@ -301,7 +301,7 @@ func (rn *Network) processReq(req reqMsg) {
 			ms = (rand.Int() % 7000)
 		} else {
 			// many kv tests require the client to try each
-			// server in fairly rapid succession.
+			// storage in fairly rapid succession.
 			ms = (rand.Int() % 100)
 		}
 		time.AfterFunc(time.Duration(ms)*time.Millisecond, func() {
@@ -346,7 +346,7 @@ func (rn *Network) DeleteServer(servername interface{}) {
 	rn.servers[servername] = nil
 }
 
-// connect a ClientEnd to a server.
+// connect a ClientEnd to a storage.
 // a ClientEnd can only be connected once in its lifetime.
 func (rn *Network) Connect(endname interface{}, servername interface{}) {
 	rn.mu.Lock()
@@ -363,7 +363,7 @@ func (rn *Network) Enable(endname interface{}, enabled bool) {
 	rn.enabled[endname] = enabled
 }
 
-// get a server's count of incoming RPCs.
+// get a storage's count of incoming RPCs.
 func (rn *Network) GetCount(servername interface{}) int {
 	rn.mu.Lock()
 	defer rn.mu.Unlock()
@@ -383,9 +383,9 @@ func (rn *Network) GetTotalBytes() int64 {
 }
 
 //
-// a server is a collection of services, all sharing
+// a storage is a collection of services, all sharing
 // the same rpc dispatcher. so that e.g. both a Raft
-// and a k/v server can listen to the same rpc endpoint.
+// and a k/v storage can listen to the same rpc endpoint.
 //
 type Server struct {
 	mu       sync.Mutex
@@ -439,7 +439,7 @@ func (rs *Server) GetCount() int {
 }
 
 // an object with methods that can be called via RPC.
-// a single server may have more than one Service.
+// a single storage may have more than one Service.
 type Service struct {
 	name    string
 	rcvr    reflect.Value
