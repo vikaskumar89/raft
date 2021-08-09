@@ -1,6 +1,6 @@
 package raft
 
-func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
+func (rf *Raft) sendRequestVoteRPC(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
 	//VERY IMPORTANT:
 	//this function may wait for quite a long time to return.
 	//we sometimes need to resend a heartbeat before it return.
@@ -24,5 +24,10 @@ func (rf *Raft) checkRequestVote(reply RequestVoteReply, currentTerm int) bool {
 
 func (rf *Raft) sendAppendEntriesRPC(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
+
+func (rf *Raft) sendInstallSnapshotRPC(server int, args *InstallSnapshotArgs, reply *InstallSnapshotReply) bool {
+	ok := rf.peers[server].Call("Raft.InstallSnapshot", args, reply)
 	return ok
 }

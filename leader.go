@@ -193,3 +193,31 @@ func (rf *Raft) checkAppendEntriesReply(reply AppendEntriesReply, currentTerm in
 	}
 	return true
 }
+
+func (rf *Raft) sender_snapshot(args InstallSnapshotArgs, currentTerm int, server int) {
+	reply := InstallSnapshotReply{}
+	ok := rf.sendInstallSnapshotRPC(server, &args, &reply)
+	if ok && !rf.killed() {
+		DPrintf("leader %d receive sendInstallSnapshot reply from %d\n", rf.me, server)
+		rf.mu.Lock()
+		defer rf.mu.Unlock()
+		//defer fmt.Printf("server %d sender exit, ok==true\n", rf.me)
+		if currentTerm != rf.currentTerm || rf.State != LEADER || rf.checkInstallSnapshotReply(reply) == false {
+			return
+		}
+		rf.NextIndex[server] = args.LastIncludedIndex + 1
+	}
+}
+
+func (rf *Raft) checkInstallSnapshotReply(reply InstallSnapshotReply) bool {
+	if reply.Term > rf.currentTerm {
+		//we are outdated
+		rf.heartbeatTimerTerminateChannel <- true
+		rf.State = FOLLOWER
+		rf.currentTerm = reply.Term
+		rf.persist()
+		rf.resetTimer() //restart ticker
+		return false
+	}
+	return true
+}

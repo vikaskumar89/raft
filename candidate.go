@@ -33,7 +33,7 @@ func (rf *Raft) candidateProcess(args RequestVoteArgs, currentTerm int) {
 			//send only once is enough to satisfy raft rules.
 			reply := RequestVoteReply{}
 			DPrintf("server %d send requestvote to %d\n", rf.me, server)
-			ok := rf.sendRequestVote(server, &args, &reply)
+			ok := rf.sendRequestVoteRPC(server, &args, &reply)
 			if ok {
 				DPrintf("server %d receive requestvote from %d\n", rf.me, server)
 				rf.mu.Lock()
