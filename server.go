@@ -127,3 +127,41 @@ func (rf *Raft) resetTimer() {
 	rf.timer.Reset(duration)
 	rf.timerLock.Unlock()
 }
+
+func (rf *Raft) GetState() (int, bool) {
+
+	var term int
+	var isleader bool
+	// Your code here (2A).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	term = rf.currentTerm
+	isleader = rf.State == LEADER
+	return term, isleader
+}
+
+func (rf *Raft) Start(command interface{}) (int, int, bool) {
+	// Your code here (2B).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	index := rf.Log.lastIndex() + 1
+	term := rf.currentTerm
+	isLeader := (rf.State == LEADER)
+
+	if isLeader == false {
+		//we are not the leader
+		return index, term, isLeader
+	}
+
+	//start the agreement
+	rf.Log.Entries = append(rf.Log.Entries, LogEntry{term, command})
+	rf.persist()
+	rf.MatchIndex[rf.me] = index
+	DPrintf("\nstart on leader %d\n", rf.me)
+	//inform goroutines in sendLog()
+	rf.newLogCome.Broadcast()
+
+	//return immediately
+	return index, term, isLeader
+}
