@@ -5,8 +5,24 @@ import (
 	"fmt"
 	"github.com/VikasSherawat/raft/labgob"
 	"math/rand"
+	"sync/atomic"
 	"time"
 )
+
+func (l *LogType) index(index int) LogEntry {
+	if index > l.LastIncludedIndex+len(l.Entries) {
+		panic("ERROR: index greater than log length!\n")
+	} else if index < l.LastIncludedIndex {
+		panic("ERROR: index smaller than log snapshot!\n")
+	} else if index == l.LastIncludedIndex {
+		//fmt.Printf("WARNING: index == l.LastIncludedIndex\n")
+		return LogEntry{Term: l.LastIncludedTerm, Command: nil}
+	}
+	return l.Entries[index-l.LastIncludedIndex-1]
+}
+func (l *LogType) lastIndex() int {
+	return l.LastIncludedIndex + len(l.Entries)
+}
 
 func (rf *Raft) persist() {
 	// Your code here (2C).
@@ -19,8 +35,8 @@ func (rf *Raft) persist() {
 	// rf.persister.SaveRaftState(data)
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
-	e.Encode(rf.currentTerm)
-	e.Encode(rf.votedFor)
+	e.Encode(rf.CurrentTerm)
+	e.Encode(rf.VotedFor)
 	e.Encode(rf.Log)
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
@@ -28,8 +44,8 @@ func (rf *Raft) persist() {
 
 func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
-		rf.currentTerm = 0
-		rf.votedFor = -1
+		rf.CurrentTerm = 0
+		rf.VotedFor = -1
 		rf.Log.Entries = make([]LogEntry, 0) //empty. (first index is one)
 		rf.Log.LastIncludedIndex = 0
 		rf.Log.LastIncludedTerm = -1
@@ -45,8 +61,8 @@ func (rf *Raft) readPersist(data []byte) {
 		d.Decode(&log) != nil {
 		fmt.Printf("server %d readPersist: decode error!", rf.me)
 	} else {
-		rf.currentTerm = currentTerm
-		rf.votedFor = votedFor
+		rf.CurrentTerm = currentTerm
+		rf.VotedFor = votedFor
 		rf.Log = log
 	}
 }
@@ -98,21 +114,6 @@ func (rf *Raft) applier() {
 	}
 	close(rf.ApplyCh)
 }
-
-func (l *LogType) index(index int) LogEntry {
-	if index > l.LastIncludedIndex+len(l.Entries) {
-		panic("ERROR: index greater than log length!\n")
-	} else if index < l.LastIncludedIndex {
-		panic("ERROR: index smaller than log snapshot!\n")
-	} else if index == l.LastIncludedIndex {
-		//fmt.Printf("WARNING: index == l.LastIncludedIndex\n")
-		return LogEntry{Term: l.LastIncludedTerm, Command: nil}
-	}
-	return l.Entries[index-l.LastIncludedIndex-1]
-}
-func (l *LogType) lastIndex() int {
-	return l.LastIncludedIndex + len(l.Entries)
-}
 func (rf *Raft) resetTimer() {
 	rf.timerLock.Lock()
 	//timer must first be stopped, then reset.
@@ -128,6 +129,14 @@ func (rf *Raft) resetTimer() {
 	rf.timerLock.Unlock()
 }
 
+func (rf *Raft) killed() bool {
+	z := atomic.LoadInt32(&rf.dead)
+	return z == 1
+}
+func (rf *Raft) Kill() {
+	atomic.StoreInt32(&rf.dead, 1)
+}
+
 func (rf *Raft) GetState() (int, bool) {
 
 	var term int
@@ -135,7 +144,7 @@ func (rf *Raft) GetState() (int, bool) {
 	// Your code here (2A).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	term = rf.currentTerm
+	term = rf.CurrentTerm
 	isleader = rf.State == LEADER
 	return term, isleader
 }
@@ -146,7 +155,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	defer rf.mu.Unlock()
 
 	index := rf.Log.lastIndex() + 1
-	term := rf.currentTerm
+	term := rf.CurrentTerm
 	isLeader := (rf.State == LEADER)
 
 	if isLeader == false {

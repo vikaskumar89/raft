@@ -15,8 +15,8 @@ type Raft struct {
 	dead      int32               // set by Kill()
 
 	//Persistent state on all servers:
-	currentTerm int
-	votedFor    int
+	CurrentTerm int
+	VotedFor    int
 	Log         LogType
 
 	//Volatile state on all servers:
@@ -40,7 +40,7 @@ type Raft struct {
 	//added in lab2B:
 	newLogCome *sync.Cond //only valid in leader state
 
-	getVote                        int
+	VoteCount                      int
 	heartbeatTimer                 time.Timer
 	heartbeatTimerTerminateChannel chan bool
 

@@ -7,15 +7,15 @@ func (rf *Raft) candidate() {
 		return
 	}
 
-	rf.currentTerm++
+	rf.CurrentTerm++
 	rf.State = CANDIDATE
 
-	//fmt.Printf("elect of process %d, term is %d\n", rf.me, rf.currentTerm)
-	currentTerm := rf.currentTerm
+	//fmt.Printf("elect of process %d, term is %d\n", rf.me, rf.CurrentTerm)
+	currentTerm := rf.CurrentTerm
 	args := RequestVoteArgs{currentTerm, rf.me, rf.Log.lastIndex(), rf.Log.index(rf.Log.lastIndex()).Term}
-	rf.votedFor = rf.me //vote for itself
+	rf.VotedFor = rf.me //vote for itself
 	rf.persist()
-	rf.getVote = 1
+	rf.VoteCount = 1
 	rf.mu.Unlock()
 
 	//start len(rf.peers) subgoroutines to handle leader job seperately.
@@ -38,14 +38,14 @@ func (rf *Raft) candidateProcess(args RequestVoteArgs, currentTerm int) {
 				DPrintf("server %d receive requestvote from %d\n", rf.me, server)
 				rf.mu.Lock()
 				defer rf.mu.Unlock()
-				if currentTerm != rf.currentTerm || rf.State != CANDIDATE || rf.getVote >= len(rf.peers)/2+1 || rf.checkRequestVote(reply, currentTerm) == false {
+				if currentTerm != rf.CurrentTerm || rf.State != CANDIDATE || rf.VoteCount >= len(rf.peers)/2+1 || rf.checkRequestVote(reply, currentTerm) == false {
 					return
 				}
 				DPrintf("server %d receive requestvote from %d: passed check\n", rf.me, server)
 				if reply.VoteGranted {
 					DPrintf("server %d receive requestvote from %d: vote granted\n", rf.me, server)
-					rf.getVote++
-					if rf.getVote == len(rf.peers)/2+1 {
+					rf.VoteCount++
+					if rf.VoteCount == len(rf.peers)/2+1 {
 						go rf.leader()
 					}
 				}
@@ -55,9 +55,9 @@ func (rf *Raft) candidateProcess(args RequestVoteArgs, currentTerm int) {
 }
 
 func (rf *Raft) checkRequestVote(reply RequestVoteReply, currentTerm int) bool {
-	if reply.Term > rf.currentTerm {
+	if reply.Term > rf.CurrentTerm {
 		//we are outdated
-		rf.currentTerm = reply.Term
+		rf.CurrentTerm = reply.Term
 		rf.persist()
 		rf.State = FOLLOWER
 

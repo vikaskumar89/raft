@@ -3,17 +3,7 @@ package raft
 import (
 	"container/heap"
 	"log"
-	"sync/atomic"
 )
-
-func (rf *Raft) killed() bool {
-	z := atomic.LoadInt32(&rf.dead)
-	return z == 1
-}
-func (rf *Raft) Kill() {
-	atomic.StoreInt32(&rf.dead, 1)
-	// Your code here, if desired.
-}
 
 const Debug = false
 
@@ -53,4 +43,11 @@ func findKthLargest(nums []int, k int) int {
 		}
 	}
 	return (*h)[0]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

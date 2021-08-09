@@ -19,7 +19,7 @@ func (rf *Raft) leader() {
 	}
 	rf.MatchIndex = make([]int, len(rf.peers)) //initialized to 0.
 
-	currentTerm := rf.currentTerm
+	currentTerm := rf.CurrentTerm
 
 	//set a timer for all subgoroutines created by rf.leaderProcess(to send heartbeat).
 	heartbeatTimer := time.NewTimer(heartbeatInterval)
@@ -58,7 +58,7 @@ func (rf *Raft) leaderProcess(currentTerm int) {
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
 			for !rf.killed() {
-				if rf.currentTerm != currentTerm && rf.State != LEADER {
+				if rf.CurrentTerm != currentTerm && rf.State != LEADER {
 					return
 				}
 
@@ -66,7 +66,7 @@ func (rf *Raft) leaderProcess(currentTerm int) {
 
 				//if LEADER is idle, then it should wait until new log entry comes or timer fire.
 				for !rf.killed() && rf.NextIndex[server] > rf.Log.lastIndex() {
-					if rf.currentTerm != currentTerm && rf.State != LEADER {
+					if rf.CurrentTerm != currentTerm && rf.State != LEADER {
 						return
 					}
 					//if it wakes up and find still idle,
@@ -83,7 +83,7 @@ func (rf *Raft) leaderProcess(currentTerm int) {
 				//not idle
 				//still in rf.mu.Lock()
 				if !rf.killed() && rf.NextIndex[server] <= rf.Log.lastIndex() {
-					if rf.currentTerm != currentTerm && rf.State != LEADER {
+					if rf.CurrentTerm != currentTerm && rf.State != LEADER {
 						return
 					}
 					prevLogIndex = rf.NextIndex[server] - 1
@@ -126,7 +126,7 @@ func (rf *Raft) sendAppendEntries(args AppendEntriesArgs, currentTerm int, serve
 		rf.mu.Lock()
 		defer rf.mu.Unlock()
 		//defer fmt.Printf("server %d sender exit, ok==true\n", rf.me)
-		if currentTerm != rf.currentTerm || rf.State != LEADER || rf.checkAppendEntriesReply(reply, currentTerm) == false {
+		if currentTerm != rf.CurrentTerm || rf.State != LEADER || rf.checkAppendEntriesReply(reply, currentTerm) == false {
 			return
 		}
 		rf.appendEntriesReplyHandle(args, reply, currentTerm, server)
@@ -140,7 +140,7 @@ func (rf *Raft) appendEntriesReplyHandle(args AppendEntriesArgs, reply AppendEnt
 		rf.NextIndex[server] = args.PrevLogIndex + len(args.Entries) + 1
 		rf.MatchIndex[server] = args.PrevLogIndex + len(args.Entries)
 		majorityMatchIndex := findKthLargest(rf.MatchIndex, len(rf.peers)/2+1)
-		if majorityMatchIndex > rf.CommitIndex && rf.Log.index(majorityMatchIndex).Term == rf.currentTerm {
+		if majorityMatchIndex > rf.CommitIndex && rf.Log.index(majorityMatchIndex).Term == rf.CurrentTerm {
 			rf.CommitIndex = majorityMatchIndex
 			DPrintf("leader MatchIndex: %v\n", rf.MatchIndex)
 			if rf.CommitIndex > rf.LastApplied {
@@ -182,11 +182,11 @@ func (rf *Raft) appendEntriesReplyHandle(args AppendEntriesArgs, reply AppendEnt
 }
 
 func (rf *Raft) checkAppendEntriesReply(reply AppendEntriesReply, currentTerm int) bool {
-	if reply.Term > rf.currentTerm {
+	if reply.Term > rf.CurrentTerm {
 		//we are outdated
 		rf.heartbeatTimerTerminateChannel <- true
 		rf.State = FOLLOWER
-		rf.currentTerm = reply.Term
+		rf.CurrentTerm = reply.Term
 		rf.persist()
 		rf.resetTimer() //restart ticker
 		return false
@@ -202,7 +202,7 @@ func (rf *Raft) sender_snapshot(args InstallSnapshotArgs, currentTerm int, serve
 		rf.mu.Lock()
 		defer rf.mu.Unlock()
 		//defer fmt.Printf("server %d sender exit, ok==true\n", rf.me)
-		if currentTerm != rf.currentTerm || rf.State != LEADER || rf.checkInstallSnapshotReply(reply) == false {
+		if currentTerm != rf.CurrentTerm || rf.State != LEADER || rf.checkInstallSnapshotReply(reply) == false {
 			return
 		}
 		rf.NextIndex[server] = args.LastIncludedIndex + 1
@@ -210,11 +210,11 @@ func (rf *Raft) sender_snapshot(args InstallSnapshotArgs, currentTerm int, serve
 }
 
 func (rf *Raft) checkInstallSnapshotReply(reply InstallSnapshotReply) bool {
-	if reply.Term > rf.currentTerm {
+	if reply.Term > rf.CurrentTerm {
 		//we are outdated
 		rf.heartbeatTimerTerminateChannel <- true
 		rf.State = FOLLOWER
-		rf.currentTerm = reply.Term
+		rf.CurrentTerm = reply.Term
 		rf.persist()
 		rf.resetTimer() //restart ticker
 		return false

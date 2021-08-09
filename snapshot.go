@@ -2,6 +2,7 @@ package raft
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/VikasSherawat/raft/labgob"
 )
 
@@ -62,10 +63,53 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 func (rf *Raft) persistStateAndSnapshot(snapshot []byte) {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
-	e.Encode(rf.currentTerm)
-	e.Encode(rf.votedFor)
+	e.Encode(rf.CurrentTerm)
+	e.Encode(rf.VotedFor)
 	e.Encode(rf.Log)
 	data := w.Bytes()
 
 	rf.persister.SaveStateAndSnapshot(data, snapshot)
+}
+
+func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
+	rf.mu.Lock()
+	DPrintf("server %d receive InstallSnapshot from %d\n", rf.me, args.LeaderID)
+	defer rf.mu.Unlock()
+	defer func() { reply.Term = rf.CurrentTerm }()
+
+	switch {
+	case args.Term < rf.CurrentTerm:
+		//outdated request
+		DPrintf("server %d: InstallSnapshot, args.Term%d < rf.CurrentTerm%d\n", rf.me, args.Term, rf.CurrentTerm)
+		return
+
+	case args.Term > rf.CurrentTerm:
+		//we are outdated
+		rf.CurrentTerm = args.Term
+		rf.persist()
+
+		if rf.State != FOLLOWER {
+			rf.State = FOLLOWER
+		}
+
+	case args.Term == rf.CurrentTerm:
+		//normal
+		if rf.State == LEADER {
+			fmt.Printf("ERROR! Another LEADER in current term?!") //impossible
+		} else if rf.State == CANDIDATE {
+			//fmt.Printf("Candidate %d abdicate!\n", rf.me)
+			rf.State = FOLLOWER
+		}
+	}
+
+	if args.LastIncludedIndex <= rf.Log.LastIncludedIndex {
+		//coming snapshot is older than our snapshot
+		DPrintf("WARNING: outdated InstallSnapshot. This should only appear in unreliable cases.\n")
+		return
+	}
+	rf.resetTimer()
+
+	msg := ApplyMsg{SnapshotValid: true, Snapshot: args.Data, SnapshotIndex: args.LastIncludedIndex, SnapshotTerm: args.LastIncludedTerm}
+	go func() { rf.ApplyCh <- msg }()
+
 }
