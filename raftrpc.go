@@ -21,3 +21,8 @@ func (rf *Raft) checkRequestVote(reply RequestVoteReply, currentTerm int) bool {
 	}
 	return true
 }
+
+func (rf *Raft) sendAppendEntriesRPC(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}

@@ -113,3 +113,17 @@ func (l *LogType) index(index int) LogEntry {
 func (l *LogType) lastIndex() int {
 	return l.LastIncludedIndex + len(l.Entries)
 }
+func (rf *Raft) resetTimer() {
+	rf.timerLock.Lock()
+	//timer must first be stopped, then reset.
+	if !rf.timer.Stop() {
+		//this may go wrong, but very unlikely.
+		select {
+		case <-rf.timer.C: //try to drain from the channel
+		default:
+		}
+	}
+	duration := time.Duration(rand.Int())%electionTimeoutInterval + electionTimeoutStart
+	rf.timer.Reset(duration)
+	rf.timerLock.Unlock()
+}
