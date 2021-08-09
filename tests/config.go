@@ -1,4 +1,4 @@
-package raft
+package tests
 
 //
 // support for Raft tester.
@@ -13,8 +13,10 @@ import (
 	crand "crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"github.com/VikasSherawat/raft"
 	"github.com/VikasSherawat/raft/labgob"
 	"github.com/VikasSherawat/raft/labrpc"
+	"github.com/VikasSherawat/raft/server"
 	"github.com/VikasSherawat/raft/storage"
 	"log"
 	"math/big"
@@ -44,7 +46,7 @@ type config struct {
 	t         *testing.T
 	net       *labrpc.Network
 	n         int
-	rafts     []*Raft
+	rafts     []*server.Raft
 	applyErr  []string // from apply channel readers
 	connected []bool   // whether each server is on the net
 	saved     []*storage.Persister
@@ -75,7 +77,7 @@ func make_config(t *testing.T, n int, unreliable bool, snapshot bool) *config {
 	cfg.net = labrpc.MakeNetwork()
 	cfg.n = n
 	cfg.applyErr = make([]string, cfg.n)
-	cfg.rafts = make([]*Raft, cfg.n)
+	cfg.rafts = make([]*server.Raft, cfg.n)
 	cfg.connected = make([]bool, cfg.n)
 	cfg.saved = make([]*storage.Persister, cfg.n)
 	cfg.endnames = make([][]string, cfg.n)
@@ -136,7 +138,7 @@ func (cfg *config) crash1(i int) {
 	}
 }
 
-func (cfg *config) checkLogs(i int, m ApplyMsg) (string, bool) {
+func (cfg *config) checkLogs(i int, m server.ApplyMsg) (string, bool) {
 	err_msg := ""
 	v := m.Command
 	for j := 0; j < len(cfg.logs); j++ {
@@ -158,7 +160,7 @@ func (cfg *config) checkLogs(i int, m ApplyMsg) (string, bool) {
 
 // applier reads message from apply ch and checks that they match the log
 // contents
-func (cfg *config) applier(i int, applyCh chan ApplyMsg) {
+func (cfg *config) applier(i int, applyCh chan server.ApplyMsg) {
 	for m := range applyCh {
 		//fmt.Println("Debug: Reading message from channel:",i)
 		if m.CommandValid == false {
@@ -183,7 +185,7 @@ func (cfg *config) applier(i int, applyCh chan ApplyMsg) {
 const SnapShotInterval = 10
 
 // periodically snapshot raft state
-func (cfg *config) applierSnap(i int, applyCh chan ApplyMsg) {
+func (cfg *config) applierSnap(i int, applyCh chan server.ApplyMsg) {
 	lastApplied := 0
 	for m := range applyCh {
 		if m.SnapshotValid {
@@ -242,7 +244,7 @@ func (cfg *config) applierSnap(i int, applyCh chan ApplyMsg) {
 // state persister, to isolate previous instance of
 // this server. since we cannot really kill it.
 //
-func (cfg *config) start1(i int, applier func(int, chan ApplyMsg)) {
+func (cfg *config) start1(i int, applier func(int, chan server.ApplyMsg)) {
 	cfg.crash1(i)
 
 	// a fresh set of outgoing ClientEnd names.
@@ -273,9 +275,9 @@ func (cfg *config) start1(i int, applier func(int, chan ApplyMsg)) {
 
 	cfg.mu.Unlock()
 
-	applyCh := make(chan ApplyMsg)
+	applyCh := make(chan server.ApplyMsg)
 
-	rf := Make(ends, i, cfg.saved[i], applyCh)
+	rf := raft.Make(ends, i, cfg.saved[i], applyCh)
 
 	cfg.mu.Lock()
 	cfg.rafts[i] = rf
@@ -517,7 +519,7 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 		index := -1
 		for si := 0; si < cfg.n; si++ {
 			starts = (starts + 1) % cfg.n
-			var rf *Raft
+			var rf *server.Raft
 			cfg.mu.Lock()
 			if cfg.connected[starts] {
 				rf = cfg.rafts[starts]

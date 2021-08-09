@@ -1,4 +1,4 @@
-package raft
+package server
 
 func (rf *Raft) candidate() {
 	rf.mu.Lock()
