@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 )
-
 func Make(peers []*labrpc.ClientEnd, me int,
 	persister *storage.Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
@@ -23,12 +22,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	//initialize volatile fields:
 	//Volatile state on all servers:
-	rf.commitIndex = 0
-	rf.lastApplied = rf.log.LastIncludedIndex
+	rf.CommitIndex = 0
+	rf.LastApplied = rf.Log.LastIncludedIndex
 
 	//added by me
-	rf.state = follower
-	rf.applyCh = applyCh
+	rf.State = FOLLOWER
+	rf.ApplyCh = applyCh
 
 	//added in lab2B
 	rf.newLogCome = sync.NewCond(&rf.mu)

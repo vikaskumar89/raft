@@ -19,21 +19,21 @@ type Raft struct {
 	//Persistent state on all servers:
 	currentTerm int
 	votedFor    int
-	log         logType
+	Log         LogType
 
 	//Volatile state on all servers:
-	commitIndex int
-	lastApplied int
+	CommitIndex int
+	LastApplied int
 
 	//Volatile state on leaders:
-	nextIndex  []int
-	matchIndex []int
+	NextIndex  []int
+	MatchIndex []int
 
 	//Volatile state on all servers:
 	//(added by me
-	state serverState //0:follower; 1:candidate; 2:leader
+	State serverState //0:follower; 1:candidate; 2:leader
 	//tickerResetChannel chan bool
-	applyCh   chan ApplyMsg
+	ApplyCh   chan ApplyMsg
 	timer     *time.Timer
 	timerLock sync.Mutex
 	// Look at the paper's Figure 2 for a description of what
@@ -68,20 +68,29 @@ type LogEntry struct {
 	Command interface{}
 }
 
-type logType struct {
+type LogType struct {
 	Entries           []LogEntry
 	LastIncludedIndex int
 	LastIncludedTerm  int
 }
 
+type RequestVoteArgs struct {
+	// Your data here (2A, 2B).
+	Term         int
+	CandidateID  int
+	LastLogIndex int
+	LastLogTerm  int
+}
+
+//
+// example RequestVote RPC reply structure.
+// field names must start with capital letters!
+//
+type RequestVoteReply struct {
+	// Your data here (2A).
+	Term        int
+	VoteGranted bool
+}
+
 
 type serverState int
-
-const (
-	follower                serverState   = iota
-	candidate               serverState   = iota
-	leader                  serverState   = iota
-	electionTimeoutStart    time.Duration = 600 * time.Millisecond //400
-	electionTimeoutInterval time.Duration = 100 * time.Millisecond
-	heartbeatInterval       time.Duration = 200 * time.Millisecond //100
-)
