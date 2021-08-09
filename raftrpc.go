@@ -10,18 +10,6 @@ func (rf *Raft) sendRequestVoteRPC(server int, args *RequestVoteArgs, reply *Req
 	return ok
 }
 
-func (rf *Raft) checkRequestVote(reply RequestVoteReply, currentTerm int) bool {
-	if reply.Term > rf.currentTerm {
-		//we are outdated
-		rf.currentTerm = reply.Term
-		rf.persist()
-		rf.State = FOLLOWER
-
-		return false
-	}
-	return true
-}
-
 func (rf *Raft) sendAppendEntriesRPC(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
 	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
 	return ok

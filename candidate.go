@@ -54,3 +54,14 @@ func (rf *Raft) candidateProcess(args RequestVoteArgs, currentTerm int) {
 	}
 }
 
+func (rf *Raft) checkRequestVote(reply RequestVoteReply, currentTerm int) bool {
+	if reply.Term > rf.currentTerm {
+		//we are outdated
+		rf.currentTerm = reply.Term
+		rf.persist()
+		rf.State = FOLLOWER
+
+		return false
+	}
+	return true
+}

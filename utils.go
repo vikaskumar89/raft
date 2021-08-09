@@ -17,11 +17,10 @@ func (rf *Raft) Kill() {
 
 const Debug = false
 
-func DPrintf(format string, a ...interface{}) (n int, err error) {
+func DPrintf(format string, a ...interface{})  {
 	if Debug {
 		log.Printf(format, a...)
 	}
-	return
 }
 
 type IntHeap []int
